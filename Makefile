@@ -132,7 +132,7 @@ liccheck:
 # Check copyrights
 .PHONY: copyright-check
 copyright-check:
-	python scripts/check_copyright.py
+	python3 scripts/check_copyright.py
 
 ########################################
 ### Docs
@@ -151,7 +151,7 @@ docs-live:
 # Generate API documentation (ensure you add the new pages created into /mkdocs.yml --> nav)
 .PHONY: generate-api-docs
 generate-api-docs:
-	python scripts/generate_api_docs.py
+	python3 scripts/generate_api_docs.py
 
 ########################################
 ### Update Poetry Lock
@@ -207,8 +207,8 @@ clean-test:
 ########################################
 
 # Constants
-COSMOS_SDK_URL := https://github.com/fetchai/cosmos-sdk
-COSMOS_SDK_VERSION := v0.18.0
+COSMOS_SDK_URL := https://github.com/cosmos/cosmos-sdk
+COSMOS_SDK_VERSION := v0.46.10
 COSMOS_SDK_DIR := build/cosmos-sdk-proto-schema
 
 WASMD_URL := https://github.com/CosmWasm/wasmd
@@ -216,8 +216,12 @@ WASMD_VERSION := v0.27.0
 WASMD_DIR := build/wasm-proto-shema
 
 IBCGO_URL := https://github.com/cosmos/ibc-go
-IBCGO_VERSION := v2.2.0
+IBCGO_VERSION := v5.2.0
 IBCGO_DIR := build/ibcgo-proto-schema
+
+C4E_URL := https://github.com/chain4energy/c4e-chain
+C4E_VERSION := v1.2.0
+C4E_DIR := build/c4e-proto-schema
 
 COSMPY_PROTOS_DIR := cosmpy/protos
 COSMPY_SRC_DIR := cosmpy
@@ -248,14 +252,16 @@ unique = $(if $1,$(firstword $1) $(call unique,$(filter-out $(firstword $1),$1))
 
 proto: fetch_proto_schema_source generate_proto_types generate_init_py_files
 
-generate_proto_types: $(COSMOS_SDK_DIR) $(WASMD_DIR) $(IBCGO_DIR)
+generate_proto_types: $(COSMOS_SDK_DIR) $(WASMD_DIR) $(IBCGO_DIR) $(C4E_DIR)
 	rm -frv $(COSMPY_PROTOS_DIR)/*
-	python -m grpc_tools.protoc --proto_path=$(WASMD_DIR)/proto --proto_path=$(WASMD_DIR)/third_party/proto  --python_out=$(COSMPY_PROTOS_DIR) --grpc_python_out=$(COSMPY_PROTOS_DIR) $(shell find $(WASMD_DIR) \( -path */proto/* -or -path */third_party/proto/* \) -type f -name *.proto)
-	python -m grpc_tools.protoc --proto_path=$(IBCGO_DIR)/proto --proto_path=$(IBCGO_DIR)/third_party/proto  --python_out=$(COSMPY_PROTOS_DIR) --grpc_python_out=$(COSMPY_PROTOS_DIR) $(shell find $(IBCGO_DIR) \( -path */proto/* -or -path */third_party/proto/* \) -type f -name *.proto)
+	# python3 -m grpc_tools.protoc --proto_path=$(WASMD_DIR)/proto --proto_path=$(WASMD_DIR)/third_party/proto  --python_out=$(COSMPY_PROTOS_DIR) --grpc_python_out=$(COSMPY_PROTOS_DIR) $(shell find $(WASMD_DIR) \( -path */proto/* -or -path */third_party/proto/* \) -type f -name *.proto)
+	python3 -m grpc_tools.protoc --proto_path=$(IBCGO_DIR)/proto --proto_path=$(IBCGO_DIR)/third_party/proto  --python_out=$(COSMPY_PROTOS_DIR) --grpc_python_out=$(COSMPY_PROTOS_DIR) $(shell find $(IBCGO_DIR) \( -path */proto/* -or -path */third_party/proto/* \) -type f -name *.proto)
 # ensure cosmos-sdk is last as previous modules may have duplicated proto models which are now outdated
-	python -m grpc_tools.protoc --proto_path=$(COSMOS_SDK_DIR)/proto --proto_path=$(COSMOS_SDK_DIR)/third_party/proto  --python_out=$(COSMPY_PROTOS_DIR) --grpc_python_out=$(COSMPY_PROTOS_DIR) $(shell find $(COSMOS_SDK_DIR) \( -path */proto/* -or -path */third_party/proto/* \) -type f -name *.proto)
+	python3 -m grpc_tools.protoc --proto_path=$(COSMOS_SDK_DIR)/proto --proto_path=$(COSMOS_SDK_DIR)/third_party/proto  --proto_path=$(IBCGO_DIR)/third_party/proto --python_out=$(COSMPY_PROTOS_DIR) --grpc_python_out=$(COSMPY_PROTOS_DIR) $(shell find $(COSMOS_SDK_DIR) $(IBCGO_DIR)/third_party/proto/gogoproto \( -path */proto/* -or -path */third_party/proto/* \) -type f -name *.proto)
+	# other chains modules
+	python3 -m grpc_tools.protoc --proto_path=$(COSMOS_SDK_DIR)/proto --proto_path=$(IBCGO_DIR)/third_party/proto --proto_path=$(C4E_DIR)/proto --python_out=$(COSMPY_PROTOS_DIR) --grpc_python_out=$(COSMPY_PROTOS_DIR) $(shell find $(C4E_DIR) $(IBCGO_DIR)/third_party/proto/gogoproto  \( -path */proto/* -or -path */third_party/proto/* \) -type f -name *.proto)
 
-fetch_proto_schema_source: $(COSMOS_SDK_DIR) $(WASMD_DIR) $(IBCGO_DIR)
+fetch_proto_schema_source: $(COSMOS_SDK_DIR) $(WASMD_DIR) $(IBCGO_DIR) $(C4E_DIR)
 
 .PHONY: generate_init_py_files
 generate_init_py_files: generate_proto_types
@@ -287,6 +293,11 @@ $(IBCGO_DIR): Makefile
 	rm -rfv $(IBCGO_DIR)
 	git clone --branch $(IBCGO_VERSION) --depth 1 --quiet --no-checkout --filter=blob:none $(IBCGO_URL) $(IBCGO_DIR)
 	cd $(IBCGO_DIR) && git checkout $(IBCGO_VERSION) -- $(IBCGO_PROTO_RELATIVE_DIRS)
+
+$(C4E_DIR): Makefile
+	rm -rfv $(C4E_DIR)
+	git clone --branch $(C4E_VERSION) --depth 1 --quiet --no-checkout --filter=blob:none $(C4E_URL) $(C4E_DIR)
+	cd $(C4E_DIR) && git checkout $(C4E_VERSION) -- $(C4E_PROTO_RELATIVE_DIRS)
 
 debug:
 	$(info SOURCES_REGEX_TO_EXCLUDE: $(SOURCES_REGEX_TO_EXCLUDE))
